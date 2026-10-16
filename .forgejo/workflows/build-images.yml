@@ -70,7 +70,7 @@ jobs:
 
       - name: Build image
         env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.INCUS_IMAGE_GPG_PASSPHRASE }}
         run: |
           chmod +x build/build-devuan-image.sh
 
