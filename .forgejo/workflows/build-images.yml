@@ -52,12 +52,10 @@ jobs:
             python3-pip
 
           pip install --break-system-packages yq
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
 
-          curl -fsSL \
-            https://pkgs.zabbly.com/zabbly/zabbly-archive-keyring.gpg \
-            | gpg --dearmor -o /usr/share/keyrings/zabbly.gpg
-
-          echo "deb [signed-by=/usr/share/keyrings/zabbly.gpg] https://pkgs.zabbly.com/zabbly zabbly main" \
+          echo "deb [signed-by=/etc/apt/keyrings/zabbly.asc] https://pkgs.zabbly.com/zabbly zabbly main" \
             > /etc/apt/sources.list.d/zabbly.list
 
           apt-get update -qq
