@@ -1,14 +1,15 @@
 name: Build Devuan Images
 
-on:
-schedule: - cron: "0 6 * * *"
+"on":
+  schedule:
+    - cron: "0 6 * * *"
 
-workflow_dispatch:
-inputs:
-release:
-description: "Devuan release"
-type: string
-default: freia
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Devuan release"
+        type: string
+        default: freia
 
       use_snapshot:
         description: "Use snapshot.debian.org"
@@ -16,15 +17,15 @@ default: freia
         default: false
 
 env:
-IMAGE_OUTPUT_ROOT: /var/tmp/incus-images
-INCUS_REMOTE: build
-INCUS_SERVER: 192.168.1.75:8443
-INCUS_PROJECT: ci
+  IMAGE_OUTPUT_ROOT: /var/tmp/incus-images
+  INCUS_REMOTE: build
+  INCUS_SERVER: 192.168.1.75:8443
+  INCUS_PROJECT: ci
 
 jobs:
-build:
-name: Build and sign image
-runs-on: self-hosted
+  build:
+    name: Build and sign image
+    runs-on: self-hosted
 
     container:
       image: ubuntu:24.04
@@ -109,10 +110,10 @@ runs-on: self-hosted
           if-no-files-found: error
           retention-days: 7
 
-validate:
-name: Validate against remote Incus
-needs: build
-runs-on: self-hosted
+  validate:
+    name: Validate against remote Incus
+    needs: build
+    runs-on: self-hosted
 
     container:
       image: ubuntu:24.04
@@ -229,4 +230,3 @@ runs-on: self-hosted
           incus --remote "${INCUS_REMOTE}" image delete \
             --project "${INCUS_PROJECT}" \
             "${VALIDATION_ALIAS}" || true
-
