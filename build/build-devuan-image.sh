@@ -21,7 +21,7 @@
 #   [SOURCE_URL] [COMPONENTS] [USE_SNAPSHOT]
 #
 # Environment:
-#   GPG_PASSPHRASE Required.
+#   INCUS_IMAGE_GPG_PASSPHRASE Required.
 #   IMAGE_OUTPUT_ROOT Optional. Default: /var/tmp/incus-images
 #   GIT_COMMIT_SHA Optional. Added to build metadata.
 
@@ -74,7 +74,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-: "${GPG_PASSPHRASE:?GPG_PASSPHRASE is not set}"
+: "${INCUS_IMAGE_GPG_PASSPHRASE:?INCUS_IMAGE_GPG_PASSPHRASE is not set}"
 
 for tool in curl jq yq gpg distrobuilder sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || {
@@ -122,7 +122,7 @@ echo "==> Using GPG key: ${GPG_KEY_ID}"
 sign_file() {
   local file="$1"
 
-  printf '%s' "${GPG_PASSPHRASE}" |
+  printf '%s' "${INCUS_IMAGE_GPG_PASSPHRASE}" |
     gpg --batch --yes --pinentry-mode loopback \
       --passphrase-fd 0 \
       --local-user "${GPG_KEY_ID}" \
