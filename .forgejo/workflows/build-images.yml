@@ -53,13 +53,26 @@ jobs:
 
           pip install --break-system-packages yq
           mkdir -p /etc/apt/keyrings
-          curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc
 
-          echo "deb [signed-by=/etc/apt/keyrings/zabbly.asc] https://pkgs.zabbly.com/incus/stable $(. /etc/os-release && echo $VERSION_CODENAME) main" \
-          > /etc/apt/sources.list.d/zabbly-incus.list
-
+      - name: Install build prerequisites
+        run: |
+          set -eux
           apt-get update -qq
-          apt-get install -y -qq distrobuilder
+          apt-get install -y -qq \
+            ca-certificates \
+            curl \
+            gpg \
+            jq \
+            xdelta3 \
+            git \
+            golang-go \
+            python3-pip
+
+          pip install --break-system-packages yq
+
+          go install -v github.com/lxc/distrobuilder/distrobuilder@latest
+
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
 
       - name: Import image-signing key
         env:
