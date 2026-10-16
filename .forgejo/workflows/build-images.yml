@@ -28,7 +28,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: devuan/devuan:freia-2026-10-12
+      image: ubuntu:latest
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
@@ -115,7 +115,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: devuan/devuan:freia-2026-10-12
+      image: ubuntu:latest
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}

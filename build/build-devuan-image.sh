@@ -201,39 +201,31 @@ cat >"${WORK_DIR}/post-packages.sh" <<'EOF'
 set -eux
 
 # inittab if missing
-
 [ ! -e "/etc/inittab" ] && cp /usr/share/sysvinit/inittab /etc/inittab
 
 # Fix container shutdown
-
 sed -i "s#^pf::powerwait.*#pf::powerwait:/sbin/poweroff#" /etc/inittab
 
 # Disable gettys
-
 sed -i '/tty[1-6]/s/^/#/' /etc/inittab
 
 # Ensure locale is built and functional
-
 echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
 locale-gen en_US.UTF-8 UTF-8
 update-locale LANG=en_US.UTF-8
 
 # Fix cloud-init postinst configuration
-
 if [ -f /etc/init.d/cloud-init-main ]; then
-if [ -f /etc/init.d/cloud-config ]; then
-sed -i \
-"s/remote_fs cloud-init cloud-init-local/remote_fs cloud-init-main cloud-init-local/" \
-/etc/init.d/cloud-config
-update-rc.d cloud-config defaults
-update-rc.d cloud-final defaults
-fi
+  if [ -f /etc/init.d/cloud-config ]; then
+    sed -i "s/remote_fs cloud-init cloud-init-local/remote_fs cloud-init-main cloud-init-local/" /etc/init.d/cloud-config
+    update-rc.d cloud-config defaults
+    update-rc.d cloud-final defaults
+  fi
 fi
 
 # Prefer Debian snapshot repositories when configured
-
 if [ -d /etc/apt/preferences.d ]; then
-cat > /etc/apt/preferences.d/99-debian-snapshot <<PREF
+  cat > /etc/apt/preferences.d/99-debian-snapshot <<PREF
 Package: *
 Pin: origin "snapshot.debian.org"
 Pin-Priority: 900
@@ -241,13 +233,9 @@ PREF
 fi
 
 # Clean transient runtime contents
-
-mount -o bind / /mnt
-rm -rf /mnt/run/*
-umount /mnt
+rm -rf /run/*
 
 # Remove temporary shadow files
-
 rm -f /etc/*-
 EOF
 
