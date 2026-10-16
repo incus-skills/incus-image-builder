@@ -28,7 +28,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: ubuntu:24.04
+      image: node:20-bookworm
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
@@ -116,7 +116,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: ubuntu:24.04
+      image: node:20-bookworm
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
