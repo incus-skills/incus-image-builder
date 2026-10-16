@@ -28,7 +28,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: node:20-bookworm
+      image: node:26-trixie
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
@@ -114,7 +114,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: node:20-bookworm
+      image: node:26-trixie
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
