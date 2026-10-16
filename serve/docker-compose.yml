@@ -1,0 +1,25 @@
+services:
+simplestreams:
+image: nginx:alpine
+restart: unless-stopped
+
+    volumes:
+      - /srv/incus-images-public:/usr/share/nginx/html:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./nginx-simplestreams.conf:/etc/nginx/conf.d/default.conf:ro
+
+    networks:
+      - proxy-net
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.simplestreams.entrypoints=websecure"
+      - "traefik.http.routers.simplestreams.rule=Host(`images.ring-zero.co.uk`)"
+      - "traefik.http.routers.simplestreams.tls=true"
+      - "traefik.http.routers.simplestreams.tls.certresolver=cloudflare"
+      - "traefik.http.services.simplestreams.loadbalancer.server.port=80"
+      - "traefik.docker.network=proxy-net"
+
+networks:
+proxy-net:
+external: true

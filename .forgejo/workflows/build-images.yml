@@ -1,0 +1,232 @@
+name: Build Devuan Images
+
+on:
+schedule: - cron: "0 6 * * *"
+
+workflow_dispatch:
+inputs:
+release:
+description: "Devuan release"
+type: string
+default: freia
+
+      use_snapshot:
+        description: "Use snapshot.debian.org"
+        type: boolean
+        default: false
+
+env:
+IMAGE_OUTPUT_ROOT: /var/tmp/incus-images
+INCUS_REMOTE: build
+INCUS_SERVER: 192.168.1.75:8443
+INCUS_PROJECT: ci
+
+jobs:
+build:
+name: Build and sign image
+runs-on: self-hosted
+
+    container:
+      image: ubuntu:24.04
+
+    env:
+      RELEASE: ${{ inputs.release || 'freia' }}
+      USE_SNAPSHOT: ${{ inputs.use_snapshot == true && 'yes' || 'no' }}
+      GIT_COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build prerequisites
+        run: |
+          set -eux
+          apt-get update -qq
+          apt-get install -y -qq \
+            ca-certificates \
+            curl \
+            gpg \
+            jq \
+            xdelta3 \
+            python3-pip
+
+          pip install --break-system-packages yq
+
+          curl -fsSL \
+            https://pkgs.zabbly.com/zabbly/zabbly-archive-keyring.gpg \
+            | gpg --dearmor -o /usr/share/keyrings/zabbly.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/zabbly.gpg] https://pkgs.zabbly.com/zabbly zabbly main" \
+            > /etc/apt/sources.list.d/zabbly.list
+
+          apt-get update -qq
+          apt-get install -y -qq distrobuilder
+
+      - name: Import image-signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.INCUS_IMAGE_GPG_PRIVATE_KEY }}
+        run: |
+          set -eux
+          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
+
+      - name: Build image
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          chmod +x build/build-devuan-image.sh
+
+          ./build/build-devuan-image.sh \
+            devuan \
+            "${RELEASE}" \
+            amd64 \
+            default \
+            "" \
+            "" \
+            "${USE_SNAPSHOT}"
+
+      - name: Resolve artifact directory
+        run: |
+          set -eux
+
+          IMAGE_DIR="$(
+            find "${IMAGE_OUTPUT_ROOT}/images/devuan" \
+              -type f -name incus.tar.xz \
+              -printf '%h\n' \
+              | sort \
+              | tail -n 1
+          )"
+
+          test -n "${IMAGE_DIR}"
+
+          echo "IMAGE_DIR=${IMAGE_DIR}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=devuan-${RELEASE}-${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}
+          path: ${{ env.IMAGE_DIR }}
+          if-no-files-found: error
+          retention-days: 7
+
+validate:
+name: Validate against remote Incus
+needs: build
+runs-on: self-hosted
+
+    container:
+      image: ubuntu:24.04
+
+    env:
+      RELEASE: ${{ inputs.release || 'freia' }}
+      USE_SNAPSHOT: ${{ inputs.use_snapshot == true && 'yes' || 'no' }}
+      VALIDATION_CONTAINER: devuan-validate-${{ github.run_id }}
+      VALIDATION_ALIAS: devuan-validation-${{ github.run_id }}
+
+    steps:
+      - name: Install Incus client
+        run: |
+          set -eux
+          apt-get update -qq
+          apt-get install -y -qq \
+            ca-certificates \
+            curl \
+            gpg
+
+          curl -fsSL \
+            https://pkgs.zabbly.com/zabbly/zabbly-archive-keyring.gpg \
+            | gpg --dearmor -o /usr/share/keyrings/zabbly.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/zabbly.gpg] https://pkgs.zabbly.com/zabbly zabbly main" \
+            > /etc/apt/sources.list.d/zabbly.list
+
+          apt-get update -qq
+          apt-get install -y -qq incus
+
+      - name: Add remote Incus node
+        env:
+          INCUS_TOKEN: ${{ secrets.INCUS_BUILD_TOKEN }}
+        run: |
+          set -eux
+          incus remote add "${INCUS_REMOTE}" "${INCUS_SERVER}" \
+            --token "${INCUS_TOKEN}"
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: devuan-${{ env.RELEASE }}-*
+          path: image
+          merge-multiple: true
+
+      - name: Resolve downloaded image files
+        run: |
+          set -eux
+
+          IMAGE_DIR="$(
+            find image \
+              -type f -name incus.tar.xz \
+              -printf '%h\n' \
+              | head -n 1
+          )"
+
+          test -n "${IMAGE_DIR}"
+          echo "IMAGE_DIR=${IMAGE_DIR}" >> "$GITHUB_ENV"
+
+      - name: Import image on remote Incus node
+        run: |
+          set -eux
+
+          incus --remote "${INCUS_REMOTE}" image import \
+            "${IMAGE_DIR}/incus.tar.xz" \
+            "${IMAGE_DIR}/rootfs.squashfs" \
+            --alias "${VALIDATION_ALIAS}"
+
+      - name: Launch validation container
+        run: |
+          set -eux
+
+          incus --remote "${INCUS_REMOTE}" launch \
+            "${VALIDATION_ALIAS}" \
+            "${VALIDATION_CONTAINER}" \
+            --project "${INCUS_PROJECT}"
+
+      - name: Validate image
+        run: |
+          set -eux
+
+          incus --remote "${INCUS_REMOTE}" exec \
+            "${VALIDATION_CONTAINER}" \
+            --project "${INCUS_PROJECT}" \
+            -- apt-cache policy
+
+          incus --remote "${INCUS_REMOTE}" exec \
+            "${VALIDATION_CONTAINER}" \
+            --project "${INCUS_PROJECT}" \
+            -- sh -c '
+              cat /etc/apt/sources.list 2>/dev/null || true
+              cat /etc/apt/sources.list.d/* 2>/dev/null || true
+            '
+
+          if [ "${USE_SNAPSHOT}" = "yes" ]; then
+            incus --remote "${INCUS_REMOTE}" exec \
+              "${VALIDATION_CONTAINER}" \
+              --project "${INCUS_PROJECT}" \
+              -- sh -c '
+                apt-cache policy \
+                  | grep -A2 -B2 snapshot.debian.org \
+                  | grep -q " 900 "
+              '
+          fi
+
+      - name: Clean up validation resources
+        if: always()
+        run: |
+          incus --remote "${INCUS_REMOTE}" delete \
+            --force \
+            --project "${INCUS_PROJECT}" \
+            "${VALIDATION_CONTAINER}" || true
+
+          incus --remote "${INCUS_REMOTE}" image delete \
+            --project "${INCUS_PROJECT}" \
+            "${VALIDATION_ALIAS}" || true
+
