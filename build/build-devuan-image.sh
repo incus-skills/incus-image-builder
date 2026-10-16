@@ -1,52 +1,29 @@
 #!/usr/bin/env bash
 
 #
-
 # build-devuan-image.sh
-
 #
-
 # Build a Devuan Incus container image with distrobuilder.
-
 #
-
 # Produces:
-
-# incus.tar.xz
-
-# rootfs.squashfs
-
-# image.yaml
-
-# build.log
-
-# build-metadata.json
-
-# SHA256SUMS
-
-# *.asc
-
-# optional *.delta and *.delta.asc
-
+#   incus.tar.xz
+#   rootfs.squashfs
+#   image.yaml
+#   build.log
+#   build-metadata.json
+#   SHA256SUMS
+#   *.asc
+#   optional *.delta and *.delta.asc
 #
-
 # Usage:
-
-# ./build-devuan-image.sh \
-
-# [DISTRO] [RELEASE] [ARCH] [VARIANT] \
-
-# [SOURCE_URL] [COMPONENTS] [USE_SNAPSHOT]
-
+#   ./build-devuan-image.sh \
+#   [DISTRO] [RELEASE] [ARCH] [VARIANT] \
+#   [SOURCE_URL] [COMPONENTS] [USE_SNAPSHOT]
 #
-
 # Environment:
-
-# GPG_PASSPHRASE Required.
-
-# IMAGE_OUTPUT_ROOT Optional. Default: /var/tmp/incus-images
-
-# GIT_COMMIT_SHA Optional. Added to build metadata.
+#   GPG_PASSPHRASE Required.
+#   IMAGE_OUTPUT_ROOT Optional. Default: /var/tmp/incus-images
+#   GIT_COMMIT_SHA Optional. Added to build metadata.
 
 set -euo pipefail
 
@@ -68,18 +45,18 @@ GIT_COMMIT_SHA="${GIT_COMMIT_SHA:-unknown}"
 
 case "${RELEASE}" in
 freia)
-DEBIAN_RELEASE="forky"
-;;
+  DEBIAN_RELEASE="forky"
+  ;;
 ceres)
-DEBIAN_RELEASE="sid"
-;;
+  DEBIAN_RELEASE="sid"
+  ;;
 excalibur)
-DEBIAN_RELEASE="trixie"
-;;
+  DEBIAN_RELEASE="trixie"
+  ;;
 *)
-echo "ERROR: unknown release '${RELEASE}'. Expected freia, ceres, or excalibur." >&2
-exit 1
-;;
+  echo "ERROR: unknown release '${RELEASE}'. Expected freia, ceres, or excalibur." >&2
+  exit 1
+  ;;
 esac
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -93,22 +70,22 @@ BUILD_LOG="${TARGET_DIR}/build.log"
 # ──────────────────────────────────────────────────────────────────────────────
 
 if [[ "$(id -u)" -ne 0 ]]; then
-echo "ERROR: this script must run as root." >&2
-exit 1
+  echo "ERROR: this script must run as root." >&2
+  exit 1
 fi
 
 : "${GPG_PASSPHRASE:?GPG_PASSPHRASE is not set}"
 
 for tool in curl jq yq gpg distrobuilder sha256sum; do
-command -v "$tool" >/dev/null 2>&1 || {
-echo "ERROR: required tool not found: ${tool}" >&2
-exit 1
-}
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "ERROR: required tool not found: ${tool}" >&2
+    exit 1
+  }
 done
 
 if [[ -d "${TARGET_DIR}" && -n "$(ls -A "${TARGET_DIR}" 2>/dev/null)" ]]; then
-echo "ERROR: output directory already exists and is not empty: ${TARGET_DIR}" >&2
-exit 1
+  echo "ERROR: output directory already exists and is not empty: ${TARGET_DIR}" >&2
+  exit 1
 fi
 
 mkdir -p "${TARGET_DIR}"
@@ -123,35 +100,35 @@ echo "==> Output: ${TARGET_DIR}"
 # GPG signing key
 # ──────────────────────────────────────────────────────────────────────────────
 
-if ! gpg --list-secret-keys --with-colons "${EMAIL}" 2>/dev/null \
-| grep -q '^sec:'; then
-echo "ERROR: no GPG secret key found for ${EMAIL}." >&2
-echo "Import the long-lived image-signing private key before building." >&2
-exit 1
+if ! gpg --list-secret-keys --with-colons "${EMAIL}" 2>/dev/null |
+  grep -q '^sec:'; then
+  echo "ERROR: no GPG secret key found for ${EMAIL}." >&2
+  echo "Import the long-lived image-signing private key before building." >&2
+  exit 1
 fi
 
 GPG_KEY_ID="$(
-gpg --list-secret-keys --with-colons "${EMAIL}" \
-| awk -F: '/^fpr:/ { print $10; exit }'
+  gpg --list-secret-keys --with-colons "${EMAIL}" |
+    awk -F: '/^fpr:/ { print $10; exit }'
 )"
 
 if [[ -z "${GPG_KEY_ID}" ]]; then
-echo "ERROR: unable to determine GPG key fingerprint." >&2
-exit 1
+  echo "ERROR: unable to determine GPG key fingerprint." >&2
+  exit 1
 fi
 
 echo "==> Using GPG key: ${GPG_KEY_ID}"
 
 sign_file() {
-local file="$1"
+  local file="$1"
 
-printf '%s' "${GPG_PASSPHRASE}" \
-| gpg --batch --yes --pinentry-mode loopback \
---passphrase-fd 0 \
---local-user "${GPG_KEY_ID}" \
---armor --detach-sign \
---output "${file}.asc" \
-"${file}"
+  printf '%s' "${GPG_PASSPHRASE}" |
+    gpg --batch --yes --pinentry-mode loopback \
+      --passphrase-fd 0 \
+      --local-user "${GPG_KEY_ID}" \
+      --armor --detach-sign \
+      --output "${file}.asc" \
+      "${file}"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -166,27 +143,27 @@ YAML_FILE="${WORK_DIR}/${DISTRO}.yaml"
 echo "==> Downloading lxc-ci image definition..."
 
 curl -fsSL \
--o "${YAML_FILE}" \
-"https://raw.githubusercontent.com/lxc/lxc-ci/main/images/${DISTRO}.yaml"
+  -o "${YAML_FILE}" \
+  "https://raw.githubusercontent.com/lxc/lxc-ci/main/images/${DISTRO}.yaml"
 
 echo "==> Adding debian-archive-keyring to early package set..."
 
 yq -yi \
---arg keyring "debian-archive-keyring" \
-'.packages.sets[0].packages += [$keyring]' \
-"${YAML_FILE}"
+  --arg keyring "debian-archive-keyring" \
+  '.packages.sets[0].packages += [$keyring]' \
+  "${YAML_FILE}"
 
 echo "==> Configuring Devuan repositories..."
 
-cat > "${WORK_DIR}/devuan_repo.txt" <<EOF
+cat >"${WORK_DIR}/devuan_repo.txt" <<EOF
 deb [check-valid-until=no signed-by=/usr/share/keyrings/devuan-archive-keyring.pgp] ${SOURCE_URL} {{ image.release }} ${COMPONENTS}
 deb [check-valid-until=no signed-by=/usr/share/keyrings/devuan-archive-keyring.pgp] ${SOURCE_URL} {{ image.release }}-security ${COMPONENTS}
 EOF
 
 yq -yi \
---rawfile devuan_repo "${WORK_DIR}/devuan_repo.txt" \
-'.packages.repositories = [{name: "devuan", url: $devuan_repo}]' \
-"${YAML_FILE}"
+  --rawfile devuan_repo "${WORK_DIR}/devuan_repo.txt" \
+  '.packages.repositories = [{name: "devuan", url: $devuan_repo}]' \
+  "${YAML_FILE}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Optional Debian snapshot repositories
@@ -196,38 +173,21 @@ SNAP_TS=""
 SNAP_SEC_TS=""
 
 if [[ "${USE_SNAPSHOT}" == "yes" ]]; then
-echo "==> Resolving latest snapshot.debian.org timestamps..."
+  echo "==> Generating snapshot.debian.org timestamps..."
 
-latest_snapshot_ts() {
-local archive="$1"
-curl -fsSL "https://snapshot.debian.org/mr/timestamp/${archive}/latest/" \
-| jq -r '.result // empty'
-}
+  SNAP_TS="$(date -u -d '1 hour ago' +%Y%m%dT%H%M%SZ)"
+  SNAP_SEC_TS="${SNAP_TS}"
 
-SNAP_TS="$(latest_snapshot_ts debian)"
-SNAP_SEC_TS="$(latest_snapshot_ts debian-security)"
-
-[[ -n "${SNAP_TS}" ]] || {
-echo "ERROR: no Debian snapshot timestamp returned." >&2
-exit 1
-}
-
-[[ -n "${SNAP_SEC_TS}" ]] || {
-echo "ERROR: no debian-security snapshot timestamp returned." >&2
-exit 1
-}
-
-echo "==> Snapshot: debian=${SNAP_TS}, debian-security=${SNAP_SEC_TS}"
-
-cat > "${WORK_DIR}/snapshot_repo.txt" <<EOF
+  echo "==> Snapshot: debian=${SNAP_TS}, debian-security=${SNAP_SEC_TS}"
+  cat >"${WORK_DIR}/snapshot_repo.txt" <<EOF
 deb [check-valid-until=no signed-by=/usr/share/keyrings/debian-archive-keyring.pgp] https://snapshot.debian.org/archive/debian/${SNAP_TS}/ ${DEBIAN_RELEASE} main contrib non-free non-free-firmware
 deb [check-valid-until=no signed-by=/usr/share/keyrings/debian-archive-keyring.pgp] https://snapshot.debian.org/archive/debian-security/${SNAP_SEC_TS}/ ${DEBIAN_RELEASE}/updates main contrib non-free non-free-firmware
 EOF
 
-yq -yi \
---rawfile snap_repo "${WORK_DIR}/snapshot_repo.txt" \
-'.packages.repositories += [{name: "debian-snapshot", url: $snap_repo}]' \
-"${YAML_FILE}"
+  yq -yi \
+    --rawfile snap_repo "${WORK_DIR}/snapshot_repo.txt" \
+    '.packages.repositories += [{name: "debian-snapshot", url: $snap_repo}]' \
+    "${YAML_FILE}"
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -236,7 +196,7 @@ fi
 
 echo "==> Updating post-packages action..."
 
-cat > "${WORK_DIR}/post-packages.sh" <<'EOF'
+cat >"${WORK_DIR}/post-packages.sh" <<'EOF'
 #!/bin/sh
 set -eux
 
@@ -292,21 +252,21 @@ rm -f /etc/*-
 EOF
 
 yq -yi \
---rawfile action "${WORK_DIR}/post-packages.sh" \
-'(.actions[] | select(.trigger == "post-packages") | .action) = $action' \
-"${YAML_FILE}"
+  --rawfile action "${WORK_DIR}/post-packages.sh" \
+  '(.actions[] | select(.trigger == "post-packages") | .action) = $action' \
+  "${YAML_FILE}"
 
 if ! yq -r \
-'.actions[] | select(.trigger == "post-packages") | .action' \
-"${YAML_FILE}" | grep -q '^#!/bin/sh'; then
-echo "ERROR: failed to update post-packages action." >&2
-exit 1
+  '.actions[] | select(.trigger == "post-packages") | .action' \
+  "${YAML_FILE}" | grep -q '^#!/bin/sh'; then
+  echo "ERROR: failed to update post-packages action." >&2
+  exit 1
 fi
 
 yq -yi \
---arg url "${SOURCE_URL}" \
-'.source.url = $url' \
-"${YAML_FILE}"
+  --arg url "${SOURCE_URL}" \
+  '.source.url = $url' \
+  "${YAML_FILE}"
 
 cp "${YAML_FILE}" "${TARGET_DIR}/image.yaml"
 
@@ -317,13 +277,13 @@ cp "${YAML_FILE}" "${TARGET_DIR}/image.yaml"
 echo "==> Running distrobuilder build-incus..."
 
 distrobuilder build-incus \
-"${YAML_FILE}" \
-"${TARGET_DIR}" \
--o "image.architecture=${ARCH}" \
--o "image.release=${RELEASE}" \
--o "image.variant=${VARIANT}" \
---disable-overlay \
-2>&1 | tee "${BUILD_LOG}"
+  "${YAML_FILE}" \
+  "${TARGET_DIR}" \
+  -o "image.architecture=${ARCH}" \
+  -o "image.release=${RELEASE}" \
+  -o "image.variant=${VARIANT}" \
+  --disable-overlay \
+  2>&1 | tee "${BUILD_LOG}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Validate artifacts
@@ -332,10 +292,10 @@ distrobuilder build-incus \
 echo "==> Verifying build output..."
 
 for file in incus.tar.xz rootfs.squashfs; do
-if [[ ! -f "${TARGET_DIR}/${file}" ]]; then
-echo "ERROR: expected output file not found: ${TARGET_DIR}/${file}" >&2
-exit 1
-fi
+  if [[ ! -f "${TARGET_DIR}/${file}" ]]; then
+    echo "ERROR: expected output file not found: ${TARGET_DIR}/${file}" >&2
+    exit 1
+  fi
 done
 
 echo "==> All expected image files present."
@@ -344,7 +304,7 @@ echo "==> All expected image files present."
 # Build metadata
 # ──────────────────────────────────────────────────────────────────────────────
 
-cat > "${TARGET_DIR}/build-metadata.json" <<EOF
+cat >"${TARGET_DIR}/build-metadata.json" <<EOF
 {
 "timestamp": "${TIMESTAMP}",
 "git_commit_sha": "${GIT_COMMIT_SHA}",
@@ -370,19 +330,19 @@ echo "==> Generating SHA256SUMS..."
 cd "${TARGET_DIR}"
 
 SIGNED_FILES=(
-incus.tar.xz
-rootfs.squashfs
-image.yaml
-build.log
-build-metadata.json
+  incus.tar.xz
+  rootfs.squashfs
+  image.yaml
+  build.log
+  build-metadata.json
 )
 
-sha256sum "${SIGNED_FILES[@]}" > SHA256SUMS
+sha256sum "${SIGNED_FILES[@]}" >SHA256SUMS
 
 echo "==> Signing artifacts..."
 
 for file in "${SIGNED_FILES[@]}" SHA256SUMS; do
-sign_file "${file}"
+  sign_file "${file}"
 done
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -392,74 +352,74 @@ done
 echo "==> Looking for a compatible previous build..."
 
 PREV_DIR="$(
-find "${BASE_OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d \
-! -path "${TARGET_DIR}" \
-| sort -r \
-| head -n 1
+  find "${BASE_OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d \
+    ! -path "${TARGET_DIR}" |
+    sort -r |
+    head -n 1
 )"
 
 if [[ -n "${PREV_DIR}" ]]; then
-if [[ ! -f "${PREV_DIR}/rootfs.squashfs" ]] \
-|| [[ ! -f "${PREV_DIR}/incus.tar.xz" ]] \
-|| [[ ! -f "${PREV_DIR}/build-metadata.json" ]]; then
-echo "==> Previous build is incomplete; skipping delta generation."
-PREV_DIR=""
-fi
-fi
-
-if [[ -n "${PREV_DIR}" ]]; then
-PREV_METADATA="${PREV_DIR}/build-metadata.json"
-
-PREV_USE_SNAPSHOT="$(jq -r '.use_snapshot // ""' "${PREV_METADATA}")"
-PREV_SNAP_TS="$(jq -r '.snap_ts // ""' "${PREV_METADATA}")"
-PREV_SNAP_SEC_TS="$(jq -r '.snap_sec_ts // ""' "${PREV_METADATA}")"
-PREV_DEBIAN_RELEASE="$(jq -r '.debian_release // ""' "${PREV_METADATA}")"
-PREV_ARCH="$(jq -r '.arch // ""' "${PREV_METADATA}")"
-
-if [[ "${PREV_USE_SNAPSHOT}" != "${USE_SNAPSHOT}" ]] \
-|| [[ "${PREV_SNAP_TS}" != "${SNAP_TS}" ]] \
-|| [[ "${PREV_SNAP_SEC_TS}" != "${SNAP_SEC_TS}" ]] \
-|| [[ "${PREV_DEBIAN_RELEASE}" != "${DEBIAN_RELEASE}" ]] \
-|| [[ "${PREV_ARCH}" != "${ARCH}" ]]; then
-echo "==> Previous build parameters differ; skipping delta generation."
-PREV_DIR=""
-fi
+  if [[ ! -f "${PREV_DIR}/rootfs.squashfs" ]] ||
+    [[ ! -f "${PREV_DIR}/incus.tar.xz" ]] ||
+    [[ ! -f "${PREV_DIR}/build-metadata.json" ]]; then
+    echo "==> Previous build is incomplete; skipping delta generation."
+    PREV_DIR=""
+  fi
 fi
 
 if [[ -n "${PREV_DIR}" ]]; then
-echo "==> Generating deltas against ${PREV_DIR}"
+  PREV_METADATA="${PREV_DIR}/build-metadata.json"
 
-command -v xdelta3 >/dev/null 2>&1 || {
-echo "ERROR: xdelta3 not found." >&2
-exit 1
-}
+  PREV_USE_SNAPSHOT="$(jq -r '.use_snapshot // ""' "${PREV_METADATA}")"
+  PREV_SNAP_TS="$(jq -r '.snap_ts // ""' "${PREV_METADATA}")"
+  PREV_SNAP_SEC_TS="$(jq -r '.snap_sec_ts // ""' "${PREV_METADATA}")"
+  PREV_DEBIAN_RELEASE="$(jq -r '.debian_release // ""' "${PREV_METADATA}")"
+  PREV_ARCH="$(jq -r '.arch // ""' "${PREV_METADATA}")"
 
-xdelta3 -e -s \
-"${PREV_DIR}/rootfs.squashfs" \
-"${TARGET_DIR}/rootfs.squashfs" \
-"${TARGET_DIR}/rootfs.squashfs.delta"
+  if [[ "${PREV_USE_SNAPSHOT}" != "${USE_SNAPSHOT}" ]] ||
+    [[ "${PREV_SNAP_TS}" != "${SNAP_TS}" ]] ||
+    [[ "${PREV_SNAP_SEC_TS}" != "${SNAP_SEC_TS}" ]] ||
+    [[ "${PREV_DEBIAN_RELEASE}" != "${DEBIAN_RELEASE}" ]] ||
+    [[ "${PREV_ARCH}" != "${ARCH}" ]]; then
+    echo "==> Previous build parameters differ; skipping delta generation."
+    PREV_DIR=""
+  fi
+fi
 
-xdelta3 -e -s \
-"${PREV_DIR}/incus.tar.xz" \
-"${TARGET_DIR}/incus.tar.xz" \
-"${TARGET_DIR}/incus.tar.xz.delta"
+if [[ -n "${PREV_DIR}" ]]; then
+  echo "==> Generating deltas against ${PREV_DIR}"
 
-DELTA_FILES=(
-rootfs.squashfs.delta
-incus.tar.xz.delta
-)
+  command -v xdelta3 >/dev/null 2>&1 || {
+    echo "ERROR: xdelta3 not found." >&2
+    exit 1
+  }
 
-sha256sum "${DELTA_FILES[@]}" >> SHA256SUMS
+  xdelta3 -e -s \
+    "${PREV_DIR}/rootfs.squashfs" \
+    "${TARGET_DIR}/rootfs.squashfs" \
+    "${TARGET_DIR}/rootfs.squashfs.delta"
 
-for file in "${DELTA_FILES[@]}"; do
-sign_file "${file}"
-done
+  xdelta3 -e -s \
+    "${PREV_DIR}/incus.tar.xz" \
+    "${TARGET_DIR}/incus.tar.xz" \
+    "${TARGET_DIR}/incus.tar.xz.delta"
 
-sign_file SHA256SUMS
+  DELTA_FILES=(
+    rootfs.squashfs.delta
+    incus.tar.xz.delta
+  )
 
-echo "==> Deltas generated and signed."
+  sha256sum "${DELTA_FILES[@]}" >>SHA256SUMS
+
+  for file in "${DELTA_FILES[@]}"; do
+    sign_file "${file}"
+  done
+
+  sign_file SHA256SUMS
+
+  echo "==> Deltas generated and signed."
 else
-echo "==> No compatible previous build; skipping delta generation."
+  echo "==> No compatible previous build; skipping delta generation."
 fi
 
 echo "==> Build complete: ${TARGET_DIR}"
