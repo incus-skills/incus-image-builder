@@ -28,7 +28,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: node:26-trixie
+      image: devuan/devuan:freia-2026-10-12
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
@@ -51,6 +51,7 @@ jobs:
             xdelta3 \
             git \
             golang-go \
+            nodejs \
             python3-pip \
             libbtrfs-dev \
             btrfs-progs
@@ -114,7 +115,7 @@ jobs:
     runs-on: incus-runner_sistarte
 
     container:
-      image: node:26-trixie
+      image: devuan/devuan:freia-2026-10-12
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
