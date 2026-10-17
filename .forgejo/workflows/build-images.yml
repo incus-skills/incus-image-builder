@@ -32,7 +32,7 @@ jobs:
 
     env:
       RELEASE: ${{ inputs.release || 'freia' }}
-      USE_SNAPSHOT: ${{ inputs.use_snapshot == true && 'yes' || 'no' }}
+      USE_SNAPSHOT: ${{ inputs.use_snapshot == 'true' && 'yes' || 'no' }}
       GIT_COMMIT_SHA: ${{ github.sha }}
 
     steps:
@@ -87,14 +87,13 @@ jobs:
       - name: Resolve artifact directory
         run: |
           set -eux
-
+    
           IMAGE_DIR="$(
-            find "${IMAGE_OUTPUT_ROOT}/images/devuan" \
+            find image \
               -type f -name incus.tar.xz \
               -printf '%h\n' \
-              | sort \
-              | tail -n 1
-          )"
+            | sed -n 1p \
+          )"   
 
           test -n "${IMAGE_DIR}"
 
@@ -179,7 +178,8 @@ jobs:
           incus --remote "${INCUS_REMOTE}" image import \
             "${IMAGE_DIR}/incus.tar.xz" \
             "${IMAGE_DIR}/rootfs.squashfs" \
-            --alias "${VALIDATION_ALIAS}"
+            --alias "${VALIDATION_ALIAS}" \
+            --project "${INCUS_PROJECT}"
 
       - name: Launch validation container
         run: |

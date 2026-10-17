@@ -3,15 +3,11 @@ set -euo pipefail
 
 EMAIL="incus.images@ring-zero.co.uk"
 NAME="Incus Image Builder"
-OUTPUT="incus-image-signing-private-key.asc"
-OUTPUT2="incus-image-signing-private-passphrase"
+OUTPUT="../incus-image-signing-private-key.asc"
+OUTPUT2="../incus-image-signing-private-passphrase"
 
-GPG_PASSPHRASE=$(
-  shuf -n 4 /usr/share/dict/words | tr '\n' ' '
-  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16
-  echo
-)
-echo "${GPG_PASSPHRASE}" >../"${OUTPUT2}"
+GPG_PASSPHRASE="$(shuf -n 4 /usr/share/dict/words | tr '\n' ' ' | sed 's/ $//')$(head -c 16 <(tr -dc 'A-Za-z0-9' </dev/urandom))"
+echo "${GPG_PASSPHRASE}" >"../${OUTPUT2}"
 
 PASSPHRASE="${GPG_PASSPHRASE:?Set GPG_PASSPHRASE env var (must be a strong passphrase)}"
 
@@ -44,12 +40,13 @@ gpg --batch --pinentry-mode loopback --passphrase "$PASSPHRASE" \
 
 # --- Verify the exported file ---
 echo "Verifying exported key..."
-gpg --dry-run --import ../"$OUTPUT"
+gpg --batch --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+  --dry-run --import "$OUTPUT"
 
 # --- Show first line as sanity check ---
-echo "First line: $(head -n 1 ../"$OUTPUT")"
+echo "First line: $(head -n 1 "$OUTPUT")"
 echo ""
-echo "Secret key exported to: ../$OUTPUT"
-echo "Secret passphase exported to: ../$OUTPUT2"
+echo "Secret key exported to: $OUTPUT"
+echo "Secret passphrase exported to: $OUTPUT2"
 echo "Paste its full contents into Forgejo → Settings → Actions → Secrets → INCUS_IMAGE_GPG_PRIVATE_KEY"
 echo "Paste its full contents into Forgejo → Settings → Actions → Secrets → INCUS_IMAGE_GPG_PASSPHRASE"
